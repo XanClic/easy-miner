@@ -206,18 +206,20 @@ impl Logic {
                 }
             },
 
-            FieldState::Flagged => {
-                self.unflag(gui, pos);
-            },
-
-            FieldState::Mine => {
-                gui.set_field_state(pos, FieldState::Mine);
-            },
-
-            FieldState::Safe(n) => {
+            FieldState::Safe(_) => {
                 self.unveil_surrounding_if_safe(gui, pos);
-                gui.set_field_state(pos, FieldState::Safe(n));
             },
+
+            _ => ()
+        }
+    }
+
+    pub fn toggle_flag(&mut self, gui: &mut GUI, pos: (usize, usize)) {
+        match self.game_state[pos.1][pos.0] {
+            FieldState::Veiled => self.flag(gui, pos),
+            FieldState::Flagged => self.unflag(gui, pos),
+
+            _ => ()
         }
     }
 }

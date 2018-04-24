@@ -90,11 +90,16 @@ impl GUI {
 
                 let cloned_logic = logic.clone();
                 let cloned_this = this.clone();
-                event.connect_button_release_event(move |_, _mb| {
+                event.connect_button_release_event(move |_, mb| {
                     let mut cbl = cloned_logic.borrow_mut();
                     let cbs = &mut *cloned_this.borrow_mut();
 
-                    cbl.pressed(cbs, (x, y));
+                    match mb.get_button() {
+                        1 => cbl.pressed(cbs, (x, y)),
+                        3 => cbl.toggle_flag(cbs, (x, y)),
+
+                        _ => ()
+                    };
 
                     Inhibit(false)
                 });
