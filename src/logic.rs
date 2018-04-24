@@ -69,6 +69,18 @@ impl Logic {
         match label {
             FieldLabel::Mine => {
                 /* Unveil all mines */
+                let dim = self.game.get_dim();
+                for y in 0..dim.1 {
+                    for x in 0..dim.0 {
+                        match self.game.get_field_label((x, y)) {
+                            FieldLabel::Mine =>
+                                gui.set_field_state((x, y), FieldState::Mine),
+
+                            _ => ()
+                        }
+                    }
+                }
+                return;
             },
 
             FieldLabel::Safe(0) => {
