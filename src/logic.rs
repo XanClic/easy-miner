@@ -210,10 +210,13 @@ impl Logic {
                 self.unflag(gui, pos);
             },
 
-            FieldState::Mine => (),
+            FieldState::Mine => {
+                gui.set_field_state(pos, FieldState::Mine);
+            },
 
-            FieldState::Safe(_) => {
+            FieldState::Safe(n) => {
                 self.unveil_surrounding_if_safe(gui, pos);
+                gui.set_field_state(pos, FieldState::Safe(n));
             },
         }
     }
