@@ -52,17 +52,11 @@ impl GUI {
 
                 let cloned_logic = logic.clone();
                 let cloned_this = this.clone();
-                let handler = btn.connect_clicked(move |btn| {
-                    if !btn.get_active() {
-                        // Cannot unpress
-                        btn.set_active(true);
-                    } else {
-                        // Pressed
-                        let mut cbl = cloned_logic.borrow_mut();
-                        let cbs = &mut *cloned_this.borrow_mut();
+                let handler = btn.connect_clicked(move |_| {
+                    let mut cbl = cloned_logic.borrow_mut();
+                    let cbs = &mut *cloned_this.borrow_mut();
 
-                        cbl.pressed(cbs, (x, y));
-                    }
+                    cbl.pressed(cbs, (x, y));
                 });
 
                 btn.set_hexpand(true);
