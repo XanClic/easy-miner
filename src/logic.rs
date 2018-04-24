@@ -53,6 +53,7 @@ pub struct Logic {
     mine_count: usize,
     unveiled_count: usize,
     game_state: GameState,
+    known_future_state: GameState,
 
     game_over: bool,
     ui_updates: Vec<UIUpdate>,
@@ -64,6 +65,9 @@ impl Logic {
         let dim = game.get_dim();
         let mine_count = game.get_mine_count();
 
+        let game_state = GameState::new(dim, mine_count);
+        let future_state = game_state.clone();
+
         Logic {
             game: game,
 
@@ -74,7 +78,8 @@ impl Logic {
             flag_count: 0,
             mine_count: mine_count,
             unveiled_count: 0,
-            game_state: GameState::new(dim, mine_count),
+            game_state: game_state,
+            known_future_state: future_state,
 
             game_over: false,
             ui_updates: Vec::<UIUpdate>::new(),
@@ -140,6 +145,7 @@ impl Logic {
             CellLabel::Safe(n) => ICellState::Safe(n),
         };
         self.game_state.set(pos, state);
+        self.known_future_state.set(pos, state);
 
         match label {
             CellLabel::Mine => {
@@ -195,7 +201,10 @@ impl Logic {
         }
 
         if self.auto_unveil {
+            // Auto-develops the future state
             self.unveil_around_sis(pos);
+        } else {
+            self.develop_future_state(pos);
         }
     }
 
@@ -207,11 +216,15 @@ impl Logic {
         }
 
         self.game_state.set(pos, ICellState::Flagged);
+        self.known_future_state.set(pos, ICellState::Flagged);
         self.flag_count += 1;
         self.ui_updates.push(UIUpdate { pos: pos, state: CellState::Flagged });
 
         if self.auto_unveil {
+            // Auto-develops the future state
             self.unveil_around_sis(pos);
+        } else {
+            self.develop_future_state(pos);
         }
     }
 
@@ -221,8 +234,11 @@ impl Logic {
         }
 
         self.game_state.set(pos, ICellState::Veiled);
+        self.known_future_state.set(pos, ICellState::Veiled);
         self.flag_count -= 1;
         self.ui_updates.push(UIUpdate { pos: pos, state: CellState::Veiled });
+
+        self.develop_future_state(pos);
     }
 
     fn unveil_around_sis(&mut self, center: (usize, usize)) {
@@ -236,8 +252,20 @@ impl Logic {
         }
     }
 
+    fn develop_future_state(&mut self, center: (usize, usize)) {
+        if !self.known_future_state.environment_propagate(center) {
+            // User made an error somewhere, so let's just go back to
+            // whatever...
+            self.known_future_state = self.game_state.clone();
+        }
+    }
+
     fn definitely_mined(&self, pos: (usize, usize)) -> bool {
-        let mut hypothetical_state = self.game_state.clone();
+        if self.known_future_state.get(pos) == ICellState::Flagged {
+            return true;
+        }
+
+        let mut hypothetical_state = self.known_future_state.clone();
 
         hypothetical_state.set(pos, ICellState::DefinitelySafe);
         return !hypothetical_state.environment_propagate(pos);
@@ -312,6 +340,7 @@ impl Logic {
         self.game.new_game();
 
         self.game_state.clear();
+        self.known_future_state = self.game_state.clone();
         self.mines_spread = false;
         self.flag_count = 0;
         self.unveiled_count = 0;
