@@ -250,4 +250,18 @@ impl Logic {
     pub fn get_mine_count(&self) -> usize {
         self.game.get_mine_count()
     }
+
+    pub fn new_game(&mut self) {
+        self.game.new_game();
+
+        let dim = self.game.get_dim();
+        for y in 0..dim.1 {
+            for x in 0..dim.0 {
+                self.game_state[y][x] = FieldState::Veiled;
+            }
+        }
+
+        self.mines_spread = false;
+        self.flag_count = 0;
+    }
 }

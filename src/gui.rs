@@ -137,6 +137,32 @@ impl GUI {
         {
             let cloned_logic = logic.clone();
             let cloned_this = this.clone();
+            this.borrow_mut().wnd.connect_key_press_event(move |_, key| {
+                let mut cbl = cloned_logic.borrow_mut();
+                let cbs = &mut *cloned_this.borrow_mut();
+
+                if key.get_keyval() == 110 /* 'n' */ {
+                    cbl.new_game();
+
+                    let dim = cbl.get_dim();
+                    for y in 0..dim.1 {
+                        for x in 0..dim.0 {
+                            cbs.set_field_state((x, y), FieldState::Veiled);
+                        }
+                    }
+
+                    cbs.mines_remaining.set_label(
+                        &format!("Mines flagged: 0 / {}",
+                                 cbs.total_mine_count));
+                }
+
+                Inhibit(false)
+            });
+        }
+
+        {
+            let cloned_logic = logic.clone();
+            let cloned_this = this.clone();
             this.borrow_mut().wnd.connect_configure_event(move |_, evt| {
                 let cbs = &mut *cloned_this.borrow_mut();
                 let dim = cloned_logic.borrow().get_dim();
