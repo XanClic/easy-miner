@@ -94,4 +94,14 @@ impl Game {
     pub fn get_mine_count(&self) -> usize {
         self.total_mines
     }
+
+    pub fn new_game(&mut self) {
+        for y in 0..self.dim.1 {
+            for x in 0..self.dim.0 {
+                self.mines[y][x] = false;
+            }
+        }
+
+        self.unspread_mines = self.total_mines;
+    }
 }
