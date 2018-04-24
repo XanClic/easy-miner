@@ -122,6 +122,11 @@ impl GUI {
                 btn.button.set_label("💣");
             },
 
+            FieldState::Safe(0) => {
+                btn.button.set_active(true);
+                btn.button.set_label(" ");
+            },
+
             FieldState::Safe(n) => {
                 btn.button.set_active(true);
                 btn.button.set_label(&n.to_string());
