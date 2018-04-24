@@ -12,6 +12,7 @@ pub struct Game {
 
     mines: Vec<Vec<bool>>,
     unspread_mines: usize,
+    total_mines: usize,
 }
 
 
@@ -32,6 +33,7 @@ impl Game {
 
             mines: mine_vec,
             unspread_mines: mine_count,
+            total_mines: mine_count,
         }
     }
 
@@ -87,5 +89,9 @@ impl Game {
             self.mines[y][x] = true;
             self.unspread_mines -= 1;
         }
+    }
+
+    pub fn get_mine_count(&self) -> usize {
+        self.total_mines
     }
 }
