@@ -1,4 +1,4 @@
-extern crate glib;
+extern crate gdk_pixbuf;
 extern crate gtk;
 extern crate rand;
 
