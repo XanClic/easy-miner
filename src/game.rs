@@ -1,7 +1,10 @@
 use rand;
 use rand::Rng;
 
-use gui::ClickedFieldState;
+pub enum FieldLabel {
+    Mine,
+    Safe(usize),
+}
 
 
 pub struct Game {
@@ -36,34 +39,35 @@ impl Game {
         self.dim
     }
 
-    pub fn pressed(&mut self, pos: (usize, usize)) -> ClickedFieldState {
-        if self.unspread_mines > 0 {
-            self.spread_mines(pos);
+    fn has_mine(&self, pos: (i32, i32)) -> bool {
+        if pos.0 >= 0 && (pos.0 as usize) < self.dim.0 &&
+           pos.1 >= 0 && (pos.1 as usize) < self.dim.1
+        {
+            self.mines[pos.1 as usize][pos.0 as usize]
+        } else {
+            false
         }
+    }
 
+    pub fn get_field_label(&mut self, pos: (usize, usize)) -> FieldLabel {
         if self.mines[pos.1][pos.0] {
-            ClickedFieldState::Mine
+            FieldLabel::Mine
         } else {
             let mut mine_count = 0;
+            let ipos = (pos.0 as i32, pos.1 as i32);
             for yd in -1..2 {
-                let y = pos.1 as i32 + yd;
-                if y >= 0 && (y as usize) < self.dim.1 {
-                    for xd in -1..2 {
-                        let x = pos.0 as i32 + xd;
-                        if x >= 0 && (x as usize) < self.dim.0 {
-                            if self.mines[y as usize][x as usize] {
-                                mine_count += 1;
-                            }
-                        }
+                for xd in -1..2 {
+                    if self.has_mine((ipos.0 + xd, ipos.1 + yd)) {
+                        mine_count += 1;
                     }
                 }
             }
 
-            ClickedFieldState::ProxCount(mine_count)
+            FieldLabel::Safe(mine_count)
         }
     }
 
-    fn spread_mines(&mut self, keep_free: (usize, usize)) {
+    pub fn spread_mines(&mut self, keep_free: (usize, usize)) {
         let mut rng = rand::thread_rng();
 
         while self.unspread_mines > 0 {
