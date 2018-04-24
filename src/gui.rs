@@ -16,6 +16,7 @@ struct Field {
 
 pub struct GUI {
     wnd: gtk::Window,
+    mines_remaining: gtk::Label,
     buttons: Vec<Vec<Field>>,
     logic: Option<Rc<RefCell<Logic>>>,
 
@@ -23,6 +24,8 @@ pub struct GUI {
     pxb_flagged: Pixbuf,
     pxb_mine: Pixbuf,
     pxb_safe: Vec<Pixbuf>,
+
+    total_mine_count: usize,
 }
 
 
@@ -34,17 +37,15 @@ impl GUI {
         wnd.set_title("EasyMiner");
         wnd.set_default_size(780, 420);
 
-        let dim = logic.get_dim();
-        let wnd_size = wnd.get_size();
+        let total_mine_count = logic.get_mine_count();
 
-        // FIXME: This leaves some space so the user can make the
-        // window smaller.  The user cannot shrink the window beyond
-        // the current size of the grid, so if the grid fills the
-        // whole window, it cannot be shrunk at all.  It would be nice
-        // to fix this and drop this spacing here (and in the resize
-        // handler).
-        let fs = std::cmp::min((wnd_size.0 - 30) / (dim.0 as i32),
-                               (wnd_size.1 - 20) / (dim.1 as i32));
+        let mines_remaining =
+            gtk::Label::new(Some(format!("Mines remaining: 0 / {}",
+                                         total_mine_count).as_ref()));
+
+        // Doesn't matter anyway, as the resize handler is called
+        // basically immediately after .build().
+        let fs = 16;
 
         let mut safe_vec = Vec::<Pixbuf>::new();
         for i in 0..9 {
@@ -55,6 +56,7 @@ impl GUI {
         GUI {
             wnd: wnd,
             buttons: Vec::new(),
+            mines_remaining: mines_remaining,
             logic: Some(Rc::new(RefCell::new(logic))),
 
             pxb_veiled: Pixbuf::new_from_file_at_size("images/veiled.png",
@@ -64,6 +66,8 @@ impl GUI {
             pxb_mine: Pixbuf::new_from_file_at_size("images/mine.png",
                                                     fs, fs).unwrap(),
             pxb_safe: safe_vec,
+
+            total_mine_count: total_mine_count,
         }
     }
 
@@ -115,14 +119,14 @@ impl GUI {
             this.borrow_mut().buttons.push(btn_row);
         }
 
-        let ratio = (dim.0 as f32) / (dim.1 as f32);
-        let af = gtk::AspectFrame::new(None, 0.5, 0.5, ratio, false);
-
         grid.set_halign(gtk::Align::Center);
         grid.set_valign(gtk::Align::Center);
 
-        af.add(&grid);
-        this.borrow_mut().wnd.add(&af);
+        let window_box = gtk::Box::new(gtk::Orientation::Vertical, 5);
+        window_box.add(&grid);
+        window_box.add(&this.borrow().mines_remaining);
+
+        this.borrow_mut().wnd.add(&window_box);
         this.borrow_mut().wnd.show_all();
 
         this.borrow_mut().wnd.connect_delete_event(|_, _| {
@@ -134,13 +138,22 @@ impl GUI {
             let cloned_logic = logic.clone();
             let cloned_this = this.clone();
             this.borrow_mut().wnd.connect_configure_event(move |_, evt| {
-                let dim = cloned_logic.borrow().get_dim();
-                let wnd_size = evt.get_size();
-
-                let fs = std::cmp::min(((wnd_size.0 - 30) as i32) / (dim.0 as i32),
-                                       ((wnd_size.1 - 20) as i32) / (dim.1 as i32));
-
                 let cbs = &mut *cloned_this.borrow_mut();
+                let dim = cloned_logic.borrow().get_dim();
+                let mut wnd_size = evt.get_size();
+
+                // FIXME: This leaves some space so the user can make the window
+                // smaller.  The user cannot shrink the window beyond the
+                // current size of the grid, so if the grid fills the whole
+                // window, it cannot be shrunk at all.  It would be nice to fix
+                // this and drop this spacing here (and in the resize handler).
+                wnd_size.0 -= 30;
+                wnd_size.1 -= 25 +
+                    cbs.mines_remaining.get_allocated_height() as u32;
+
+                let fs = std::cmp::min((wnd_size.0 as i32) / (dim.0 as i32),
+                                       (wnd_size.1 as i32) / (dim.1 as i32));
+
                 cbs.pxb_veiled =
                     Pixbuf::new_from_file_at_size("images/veiled.png",
                                                   fs, fs).unwrap();
@@ -191,5 +204,10 @@ impl GUI {
         }
 
         btn.state = state;
+    }
+
+    pub fn set_flag_count(&mut self, count: usize) {
+        self.mines_remaining.set_label(&format!("Mines flagged: {} / {}", count,
+                                                self.total_mine_count));
     }
 }

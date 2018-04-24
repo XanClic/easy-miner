@@ -15,6 +15,7 @@ pub struct Logic {
     game: Game,
 
     mines_spread: bool,
+    flag_count: usize,
     game_state: Vec<Vec<FieldState>>,
 }
 
@@ -36,6 +37,7 @@ impl Logic {
             game: game,
 
             mines_spread: false,
+            flag_count: 0,
             game_state: state_vec,
         }
     }
@@ -131,7 +133,9 @@ impl Logic {
         }
 
         self.game_state[pos.1][pos.0] = FieldState::Flagged;
+        self.flag_count += 1;
         gui.set_field_state(pos, FieldState::Flagged);
+        gui.set_flag_count(self.flag_count);
     }
 
     fn unflag(&mut self, gui: &mut GUI, pos: (usize, usize)) {
@@ -140,7 +144,9 @@ impl Logic {
         }
 
         self.game_state[pos.1][pos.0] = FieldState::Veiled;
+        self.flag_count -= 1;
         gui.set_field_state(pos, FieldState::Veiled);
+        gui.set_flag_count(self.flag_count);
     }
 
     fn definitely_mined(&self, _pos: (usize, usize)) -> bool {
@@ -221,5 +227,9 @@ impl Logic {
 
             _ => ()
         }
+    }
+
+    pub fn get_mine_count(&self) -> usize {
+        self.game.get_mine_count()
     }
 }
