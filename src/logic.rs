@@ -125,6 +125,15 @@ impl Logic {
         }
 
         gui.set_field_state(pos, state);
+
+        for yd in -1..2 {
+            for xd in -1..2 {
+                let dpos = (pos.0 as i32 + xd, pos.1 as i32 + yd);
+                if let Some(upos) = self.pos_in_bounds(dpos) {
+                    self.unveil_surrounding_if_safe(gui, upos);
+                }
+            }
+        }
     }
 
     fn flag(&mut self, gui: &mut GUI, pos: (usize, usize)) {
@@ -136,6 +145,15 @@ impl Logic {
         self.flag_count += 1;
         gui.set_field_state(pos, FieldState::Flagged);
         gui.set_flag_count(self.flag_count);
+
+        for yd in -1..2 {
+            for xd in -1..2 {
+                let dpos = (pos.0 as i32 + xd, pos.1 as i32 + yd);
+                if let Some(upos) = self.pos_in_bounds(dpos) {
+                    self.unveil_surrounding_if_safe(gui, upos);
+                }
+            }
+        }
     }
 
     fn unflag(&mut self, gui: &mut GUI, pos: (usize, usize)) {
