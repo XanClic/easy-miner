@@ -40,7 +40,7 @@ impl GUI {
         let total_mine_count = logic.get_mine_count();
 
         let mines_remaining =
-            gtk::Label::new(Some(format!("Mines remaining: 0 / {}",
+            gtk::Label::new(Some(format!("Mines flagged: 0 / {}",
                                          total_mine_count).as_ref()));
 
         // Doesn't matter anyway, as the resize handler is called
