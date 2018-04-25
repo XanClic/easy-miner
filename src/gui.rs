@@ -94,7 +94,7 @@ impl GUI {
 
                 let cloned_logic = logic.clone();
                 let cloned_this = this.clone();
-                event.connect_button_release_event(move |_, mb| {
+                event.connect_button_press_event(move |_, mb| {
                     let mut cbl = cloned_logic.borrow_mut();
                     let cbs = &mut *cloned_this.borrow_mut();
 
