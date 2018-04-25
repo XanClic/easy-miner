@@ -1,9 +1,9 @@
-use game::{FieldLabel, Game};
+use game::{CellLabel, Game};
 use gui::GUI;
 
 
 #[derive(PartialEq, Clone, Copy)]
-pub enum FieldState {
+pub enum CellState {
     Veiled,
     Flagged,
     Mine,
@@ -18,19 +18,19 @@ pub struct Logic {
 
     mines_spread: bool,
     flag_count: usize,
-    game_state: Vec<Vec<FieldState>>,
+    game_state: Vec<Vec<CellState>>,
 }
 
 
 impl Logic {
     pub fn new(game: Game, auto_unveil: bool) -> Self {
         let dim = game.get_dim();
-        let mut state_vec = Vec::<Vec<FieldState>>::new();
+        let mut state_vec = Vec::<Vec<CellState>>::new();
 
         for _ in 0..dim.1 {
-            let mut row = Vec::<FieldState>::new();
+            let mut row = Vec::<CellState>::new();
             for _ in 0..dim.0 {
-                row.push(FieldState::Veiled);
+                row.push(CellState::Veiled);
             }
             state_vec.push(row);
         }
@@ -87,7 +87,7 @@ impl Logic {
     }
 
     fn unveil(&mut self, gui: &mut GUI, pos: (usize, usize)) {
-        if self.game_state[pos.1][pos.0] != FieldState::Veiled {
+        if self.game_state[pos.1][pos.0] != CellState::Veiled {
             return;
         }
 
@@ -96,23 +96,23 @@ impl Logic {
             self.mines_spread = true;
         }
 
-        let label = self.game.get_field_label(pos);
+        let label = self.game.get_cell_label(pos);
 
         let state = match label {
-            FieldLabel::Mine    => FieldState::Mine,
-            FieldLabel::Safe(n) => FieldState::Safe(n),
+            CellLabel::Mine    => CellState::Mine,
+            CellLabel::Safe(n) => CellState::Safe(n),
         };
         self.game_state[pos.1][pos.0] = state;
 
         match label {
-            FieldLabel::Mine => {
+            CellLabel::Mine => {
                 /* Unveil all mines */
                 let dim = self.game.get_dim();
                 for y in 0..dim.1 {
                     for x in 0..dim.0 {
-                        match self.game.get_field_label((x, y)) {
-                            FieldLabel::Mine =>
-                                gui.set_field_state((x, y), FieldState::Mine),
+                        match self.game.get_cell_label((x, y)) {
+                            CellLabel::Mine =>
+                                gui.set_cell_state((x, y), CellState::Mine),
 
                             _ => ()
                         }
@@ -121,14 +121,14 @@ impl Logic {
                 return;
             },
 
-            FieldLabel::Safe(0) => {
+            CellLabel::Safe(0) => {
                 self.unveil_surrounding(gui, pos);
             },
 
-            FieldLabel::Safe(_) => (),
+            CellLabel::Safe(_) => (),
         }
 
-        gui.set_field_state(pos, state);
+        gui.set_cell_state(pos, state);
 
         if self.auto_unveil {
             for yd in -1..2 {
@@ -143,13 +143,13 @@ impl Logic {
     }
 
     fn flag(&mut self, gui: &mut GUI, pos: (usize, usize)) {
-        if self.game_state[pos.1][pos.0] != FieldState::Veiled {
+        if self.game_state[pos.1][pos.0] != CellState::Veiled {
             return;
         }
 
-        self.game_state[pos.1][pos.0] = FieldState::Flagged;
+        self.game_state[pos.1][pos.0] = CellState::Flagged;
         self.flag_count += 1;
-        gui.set_field_state(pos, FieldState::Flagged);
+        gui.set_cell_state(pos, CellState::Flagged);
         gui.set_flag_count(self.flag_count);
 
         if self.auto_unveil {
@@ -165,13 +165,13 @@ impl Logic {
     }
 
     fn unflag(&mut self, gui: &mut GUI, pos: (usize, usize)) {
-        if self.game_state[pos.1][pos.0] != FieldState::Flagged {
+        if self.game_state[pos.1][pos.0] != CellState::Flagged {
             return;
         }
 
-        self.game_state[pos.1][pos.0] = FieldState::Veiled;
+        self.game_state[pos.1][pos.0] = CellState::Veiled;
         self.flag_count -= 1;
-        gui.set_field_state(pos, FieldState::Veiled);
+        gui.set_cell_state(pos, CellState::Veiled);
         gui.set_flag_count(self.flag_count);
     }
 
@@ -179,7 +179,7 @@ impl Logic {
         false
     }
 
-    fn get_state(&self, pos: (i32, i32)) -> Option<FieldState> {
+    fn get_state(&self, pos: (i32, i32)) -> Option<CellState> {
         if let Some(upos) = self.pos_in_bounds(pos) {
             Some(self.game_state[upos.1][upos.0])
         } else {
@@ -191,7 +191,7 @@ impl Logic {
     {
         let n;
         match self.game_state[pos.1][pos.0] {
-            FieldState::Safe(x) => n = x,
+            CellState::Safe(x) => n = x,
 
             _ => return
         };
@@ -203,16 +203,16 @@ impl Logic {
             for xd in -1..2 {
                 let state = self.get_state((ipos.0 + xd, ipos.1 + yd));
                 match state {
-                    Some(FieldState::Veiled) => {
+                    Some(CellState::Veiled) => {
                         potential_mine_count += 1;
                     }
 
-                    Some(FieldState::Flagged) => {
+                    Some(CellState::Flagged) => {
                         flag_count += 1;
                         potential_mine_count += 1;
                     },
 
-                    Some(FieldState::Mine) => {
+                    Some(CellState::Mine) => {
                         potential_mine_count += 1;
                     },
 
@@ -230,7 +230,7 @@ impl Logic {
 
     pub fn pressed(&mut self, gui: &mut GUI, pos: (usize, usize)) {
         match self.game_state[pos.1][pos.0] {
-            FieldState::Veiled => {
+            CellState::Veiled => {
                 if self.definitely_mined(pos) {
                     self.flag(gui, pos);
                 } else {
@@ -238,7 +238,7 @@ impl Logic {
                 }
             },
 
-            FieldState::Safe(_) => {
+            CellState::Safe(_) => {
                 self.unveil_surrounding_if_safe(gui, pos);
             },
 
@@ -248,8 +248,8 @@ impl Logic {
 
     pub fn toggle_flag(&mut self, gui: &mut GUI, pos: (usize, usize)) {
         match self.game_state[pos.1][pos.0] {
-            FieldState::Veiled => self.flag(gui, pos),
-            FieldState::Flagged => self.unflag(gui, pos),
+            CellState::Veiled => self.flag(gui, pos),
+            CellState::Flagged => self.unflag(gui, pos),
 
             _ => ()
         }
@@ -265,7 +265,7 @@ impl Logic {
         let dim = self.game.get_dim();
         for y in 0..dim.1 {
             for x in 0..dim.0 {
-                self.game_state[y][x] = FieldState::Veiled;
+                self.game_state[y][x] = CellState::Veiled;
             }
         }
 
