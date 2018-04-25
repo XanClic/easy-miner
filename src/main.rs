@@ -12,23 +12,50 @@ use logic::Logic;
 
 
 fn main() {
-    let args: Vec<String> = std::env::args().collect();
+    let mut args: Vec<String> = std::env::args().collect();
+    let mut free_args = Vec::<String>::new();
 
-    let width;
-    let height;
-    let mine_count;
-    if args.len() <= 1 {
-        width = 30;
-        height = 16;
-        mine_count = 99;
-    } else {
-        width = args[1].parse::<usize>().unwrap();
-        height = args[2].parse::<usize>().unwrap();
-        mine_count = args[3].parse::<usize>().unwrap();
+    args.remove(0);
+
+    let mut width = 30;
+    let mut height = 16;
+    let mut mine_count = 99;
+
+    let mut auto_unveil = false;
+
+    for arg in args {
+        if arg.starts_with("--") {
+            match arg.as_ref() {
+                "--auto-unveil" => {
+                    auto_unveil = true;
+                },
+
+                _ => {
+                    panic!("Unrecognized parameter {}", arg);
+                }
+            }
+        } else {
+            free_args.push(arg);
+        }
+    }
+
+    if free_args.len() > 0 {
+        if free_args.len() < 3 {
+            panic!("Either no or all of the field dimensions must be \
+                    specified");
+        }
+
+        width = free_args[0].parse::<usize>().unwrap();
+        height = free_args[1].parse::<usize>().unwrap();
+        mine_count = free_args[2].parse::<usize>().unwrap();
+
+        if free_args.len() > 3 {
+            panic!("Garbage arguments");
+        }
     }
 
     let game = Game::new((width, height), mine_count);
-    let logic = Logic::new(game);
+    let logic = Logic::new(game, auto_unveil);
     let gui = GUI::new(logic);
 
     gui.main_loop();
