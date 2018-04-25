@@ -14,6 +14,8 @@ pub enum FieldState {
 pub struct Logic {
     game: Game,
 
+    auto_unveil: bool,
+
     mines_spread: bool,
     flag_count: usize,
     game_state: Vec<Vec<FieldState>>,
@@ -21,7 +23,7 @@ pub struct Logic {
 
 
 impl Logic {
-    pub fn new(game: Game) -> Self {
+    pub fn new(game: Game, auto_unveil: bool) -> Self {
         let dim = game.get_dim();
         let mut state_vec = Vec::<Vec<FieldState>>::new();
 
@@ -35,6 +37,8 @@ impl Logic {
 
         Logic {
             game: game,
+
+            auto_unveil: auto_unveil,
 
             mines_spread: false,
             flag_count: 0,
@@ -126,11 +130,13 @@ impl Logic {
 
         gui.set_field_state(pos, state);
 
-        for yd in -1..2 {
-            for xd in -1..2 {
-                let dpos = (pos.0 as i32 + xd, pos.1 as i32 + yd);
-                if let Some(upos) = self.pos_in_bounds(dpos) {
-                    self.unveil_surrounding_if_safe(gui, upos);
+        if self.auto_unveil {
+            for yd in -1..2 {
+                for xd in -1..2 {
+                    let dpos = (pos.0 as i32 + xd, pos.1 as i32 + yd);
+                    if let Some(upos) = self.pos_in_bounds(dpos) {
+                        self.unveil_surrounding_if_safe(gui, upos);
+                    }
                 }
             }
         }
@@ -146,11 +152,13 @@ impl Logic {
         gui.set_field_state(pos, FieldState::Flagged);
         gui.set_flag_count(self.flag_count);
 
-        for yd in -1..2 {
-            for xd in -1..2 {
-                let dpos = (pos.0 as i32 + xd, pos.1 as i32 + yd);
-                if let Some(upos) = self.pos_in_bounds(dpos) {
-                    self.unveil_surrounding_if_safe(gui, upos);
+        if self.auto_unveil {
+            for yd in -1..2 {
+                for xd in -1..2 {
+                    let dpos = (pos.0 as i32 + xd, pos.1 as i32 + yd);
+                    if let Some(upos) = self.pos_in_bounds(dpos) {
+                        self.unveil_surrounding_if_safe(gui, upos);
+                    }
                 }
             }
         }
