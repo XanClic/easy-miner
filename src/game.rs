@@ -20,6 +20,14 @@ impl Game {
     pub fn new(dim: (usize, usize), mine_count: usize) -> Self {
         let mut mine_vec = Vec::<Vec<bool>>::new();
 
+        if dim.0 < 3 || dim.1 < 3 {
+            panic!("Field must be at least 3×3");
+        }
+
+        if dim.0 * dim.1 - 9 < mine_count {
+            panic!("Must have at least 9 free cells");
+        }
+
         for _ in 0..dim.1 {
             let mut row = Vec::<bool>::new();
             for _ in 0..dim.0 {
