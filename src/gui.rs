@@ -5,19 +5,19 @@ use std;
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use logic::{FieldState, Logic};
+use logic::{CellState, Logic};
 
 
-struct Field {
+struct Cell {
     button: gtk::Image,
-    state: FieldState,
+    state: CellState,
 }
 
 
 pub struct GUI {
     wnd: gtk::Window,
     mines_remaining: gtk::Label,
-    buttons: Vec<Vec<Field>>,
+    buttons: Vec<Vec<Cell>>,
     logic: Option<Rc<RefCell<Logic>>>,
 
     pxb_veiled: Pixbuf,
@@ -83,7 +83,7 @@ impl GUI {
 
 
         for y in 0..dim.1 {
-            let mut btn_row = Vec::<Field>::new();
+            let mut btn_row = Vec::<Cell>::new();
 
             for x in 0..dim.0 {
                 let btn =
@@ -110,9 +110,9 @@ impl GUI {
 
                 grid.attach(&event, x as i32, y as i32, 1, 1);
 
-                btn_row.push(Field {
+                btn_row.push(Cell {
                     button: btn,
-                    state: FieldState::Veiled,
+                    state: CellState::Veiled,
                 });
             }
 
@@ -147,7 +147,7 @@ impl GUI {
                     let dim = cbl.get_dim();
                     for y in 0..dim.1 {
                         for x in 0..dim.0 {
-                            cbs.set_field_state((x, y), FieldState::Veiled);
+                            cbs.set_cell_state((x, y), CellState::Veiled);
                         }
                     }
 
@@ -197,7 +197,7 @@ impl GUI {
                 for y in 0..dim.1 {
                     for x in 0..dim.0 {
                         let state = cbs.buttons[y][x].state;
-                        cbs.set_field_state((x, y), state);
+                        cbs.set_cell_state((x, y), state);
                     }
                 }
 
@@ -208,23 +208,23 @@ impl GUI {
         gtk::main();
     }
 
-    pub fn set_field_state(&mut self, pos: (usize, usize), state: FieldState) {
+    pub fn set_cell_state(&mut self, pos: (usize, usize), state: CellState) {
         let btn = &mut self.buttons[pos.1][pos.0];
 
         match state {
-            FieldState::Veiled => {
+            CellState::Veiled => {
                 btn.button.set_from_pixbuf(&self.pxb_veiled);
             },
 
-            FieldState::Flagged => {
+            CellState::Flagged => {
                 btn.button.set_from_pixbuf(&self.pxb_flagged);
             },
 
-            FieldState::Mine => {
+            CellState::Mine => {
                 btn.button.set_from_pixbuf(&self.pxb_mine);
             },
 
-            FieldState::Safe(n) => {
+            CellState::Safe(n) => {
                 btn.button.set_from_pixbuf(&self.pxb_safe[n]);
             },
         }

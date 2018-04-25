@@ -1,7 +1,7 @@
 use rand;
 use rand::Rng;
 
-pub enum FieldLabel {
+pub enum CellLabel {
     Mine,
     Safe(usize),
 }
@@ -59,9 +59,9 @@ impl Game {
         }
     }
 
-    pub fn get_field_label(&mut self, pos: (usize, usize)) -> FieldLabel {
+    pub fn get_cell_label(&mut self, pos: (usize, usize)) -> CellLabel {
         if self.mines[pos.1][pos.0] {
-            FieldLabel::Mine
+            CellLabel::Mine
         } else {
             let mut mine_count = 0;
             let ipos = (pos.0 as i32, pos.1 as i32);
@@ -73,7 +73,7 @@ impl Game {
                 }
             }
 
-            FieldLabel::Safe(mine_count)
+            CellLabel::Safe(mine_count)
         }
     }
 
