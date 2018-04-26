@@ -11,10 +11,20 @@ pub enum CellState {
     Safe(usize),
 }
 
+#[derive(PartialEq, Clone, Copy)]
+enum ICellState { // Internal CellState (with additional states)
+    Veiled,
+    Flagged,
+    Mine,
+    Safe(usize),
+    DefinitelySafe,
+}
+
 enum CellEnvironment {
     AllMines,
     AllSafe,
     Unsure,
+    Impossible,
 }
 
 
@@ -34,7 +44,7 @@ pub struct Logic {
     flag_count: usize,
     mine_count: usize,
     unveiled_count: usize,
-    game_state: Vec<Vec<CellState>>,
+    game_state: Vec<Vec<ICellState>>,
 
     game_over: bool,
     ui_updates: Vec<UIUpdate>,
@@ -44,12 +54,12 @@ pub struct Logic {
 impl Logic {
     pub fn new(game: Game, auto_unveil: bool, touch_mode: bool) -> Self {
         let dim = game.get_dim();
-        let mut state_vec = Vec::<Vec<CellState>>::new();
+        let mut state_vec = Vec::<Vec<ICellState>>::new();
 
         for _ in 0..dim.1 {
-            let mut row = Vec::<CellState>::new();
+            let mut row = Vec::<ICellState>::new();
             for _ in 0..dim.0 {
-                row.push(CellState::Veiled);
+                row.push(ICellState::Veiled);
             }
             state_vec.push(row);
         }
@@ -114,7 +124,9 @@ impl Logic {
     }
 
     fn unveil(&mut self, pos: (usize, usize)) {
-        if self.game_state[pos.1][pos.0] != CellState::Veiled {
+        assert!(self.game_state[pos.1][pos.0] != ICellState::DefinitelySafe);
+
+        if self.game_state[pos.1][pos.0] != ICellState::Veiled {
             return;
         }
 
@@ -126,8 +138,8 @@ impl Logic {
         let label = self.game.get_cell_label(pos);
 
         let state = match label {
-            CellLabel::Mine    => CellState::Mine,
-            CellLabel::Safe(n) => CellState::Safe(n),
+            CellLabel::Mine    => ICellState::Mine,
+            CellLabel::Safe(n) => ICellState::Safe(n),
         };
         self.game_state[pos.1][pos.0] = state;
 
@@ -162,7 +174,10 @@ impl Logic {
         }
 
         self.unveiled_count += 1;
-        self.ui_updates.push(UIUpdate { pos: pos, state: state });
+        self.ui_updates.push(UIUpdate {
+            pos: pos,
+            state: CellState::from(state)
+        });
 
         let dim = self.game.get_dim();
         if self.unveiled_count + self.mine_count == dim.0 * dim.1 {
@@ -173,7 +188,7 @@ impl Logic {
                 // Auto-flag the rest
                 for y in 0..dim.1 {
                     for x in 0..dim.0 {
-                        if self.game_state[y][x] == CellState::Veiled {
+                        if self.game_state[y][x] == ICellState::Veiled {
                             self.flag((x, y));
                         }
                     }
@@ -194,11 +209,13 @@ impl Logic {
     }
 
     fn flag(&mut self, pos: (usize, usize)) {
-        if self.game_state[pos.1][pos.0] != CellState::Veiled {
+        assert!(self.game_state[pos.1][pos.0] != ICellState::DefinitelySafe);
+
+        if self.game_state[pos.1][pos.0] != ICellState::Veiled {
             return;
         }
 
-        self.game_state[pos.1][pos.0] = CellState::Flagged;
+        self.game_state[pos.1][pos.0] = ICellState::Flagged;
         self.flag_count += 1;
         self.ui_updates.push(UIUpdate { pos: pos, state: CellState::Flagged });
 
@@ -215,11 +232,11 @@ impl Logic {
     }
 
     fn unflag(&mut self, pos: (usize, usize)) {
-        if self.game_state[pos.1][pos.0] != CellState::Flagged {
+        if self.game_state[pos.1][pos.0] != ICellState::Flagged {
             return;
         }
 
-        self.game_state[pos.1][pos.0] = CellState::Veiled;
+        self.game_state[pos.1][pos.0] = ICellState::Veiled;
         self.flag_count -= 1;
         self.ui_updates.push(UIUpdate { pos: pos, state: CellState::Veiled });
     }
@@ -243,7 +260,7 @@ impl Logic {
         return false;
     }
 
-    fn get_state(&self, pos: (i32, i32)) -> Option<CellState> {
+    fn get_state(&self, pos: (i32, i32)) -> Option<ICellState> {
         if let Some(upos) = self.pos_in_bounds(pos) {
             Some(self.game_state[upos.1][upos.0])
         } else {
@@ -254,7 +271,7 @@ impl Logic {
     fn safe_cell_environment(&self, pos: (usize, usize)) -> CellEnvironment {
         let n;
         match self.game_state[pos.1][pos.0] {
-            CellState::Safe(x) => { n = x; },
+            ICellState::Safe(x) => { n = x; },
 
             _ => return CellEnvironment::Unsure
         };
@@ -266,16 +283,16 @@ impl Logic {
             for xd in -1..2 {
                 let state = self.get_state((ipos.0 + xd, ipos.1 + yd));
                 match state {
-                    Some(CellState::Veiled) => {
+                    Some(ICellState::Veiled) => {
                         potential_mine_count += 1;
                     }
 
-                    Some(CellState::Flagged) => {
+                    Some(ICellState::Flagged) => {
                         flag_count += 1;
                         potential_mine_count += 1;
                     },
 
-                    Some(CellState::Mine) => {
+                    Some(ICellState::Mine) => {
                         potential_mine_count += 1;
                     },
 
@@ -288,6 +305,8 @@ impl Logic {
             CellEnvironment::AllSafe
         } else if potential_mine_count == n {
             CellEnvironment::AllMines
+        } else if flag_count > n || potential_mine_count < n {
+            CellEnvironment::Impossible
         } else {
             CellEnvironment::Unsure
         }
@@ -308,8 +327,10 @@ impl Logic {
             return;
         }
 
+        assert!(self.game_state[pos.1][pos.0] != ICellState::DefinitelySafe);
+
         match self.game_state[pos.1][pos.0] {
-            CellState::Veiled => {
+            ICellState::Veiled => {
                 if self.touch_mode {
                     if self.definitely_mined(pos) {
                         self.flag(pos);
@@ -321,7 +342,7 @@ impl Logic {
                 }
             },
 
-            CellState::Safe(_) => {
+            ICellState::Safe(_) => {
                 self.unveil_surrounding_if_safe(pos);
             },
 
@@ -334,9 +355,11 @@ impl Logic {
             return;
         }
 
+        assert!(self.game_state[pos.1][pos.0] != ICellState::DefinitelySafe);
+
         match self.game_state[pos.1][pos.0] {
-            CellState::Veiled => self.flag(pos),
-            CellState::Flagged => self.unflag(pos),
+            ICellState::Veiled => self.flag(pos),
+            ICellState::Flagged => self.unflag(pos),
 
             _ => ()
         }
@@ -360,7 +383,7 @@ impl Logic {
         let dim = self.game.get_dim();
         for y in 0..dim.1 {
             for x in 0..dim.0 {
-                self.game_state[y][x] = CellState::Veiled;
+                self.game_state[y][x] = ICellState::Veiled;
             }
         }
 
@@ -369,5 +392,19 @@ impl Logic {
         self.unveiled_count = 0;
 
         self.game_over = false;
+    }
+}
+
+
+impl CellState {
+    fn from(ics: ICellState) -> Self {
+        match ics {
+            ICellState::Veiled  => CellState::Veiled,
+            ICellState::Flagged => CellState::Flagged,
+            ICellState::Mine    => CellState::Mine,
+            ICellState::Safe(n) => CellState::Safe(n),
+
+            _ => panic!("Cannot convert ICellState to CellState")
+        }
     }
 }
