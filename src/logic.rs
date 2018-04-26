@@ -10,6 +10,12 @@ pub enum CellState {
     Safe(usize),
 }
 
+enum CellEnvironment {
+    AllMines,
+    AllSafe,
+    Unsure,
+}
+
 
 pub struct Logic {
     game: Game,
@@ -208,8 +214,23 @@ impl Logic {
         gui.set_flag_count(self.flag_count);
     }
 
-    fn definitely_mined(&self, _pos: (usize, usize)) -> bool {
-        false
+    fn definitely_mined(&self, pos: (usize, usize)) -> bool {
+        let ipos = (pos.0 as i32, pos.1 as i32);
+        for yd in -1..2 {
+            for xd in -1..2 {
+                let dpos = (ipos.0 + xd, ipos.1 + yd);
+                if let Some(upos) = self.pos_in_bounds(dpos) {
+                    match self.safe_cell_environment(upos) {
+                        CellEnvironment::AllSafe  => return false,
+                        CellEnvironment::AllMines => return true,
+
+                        _ => ()
+                    }
+                }
+            }
+        }
+
+        return false;
     }
 
     fn get_state(&self, pos: (i32, i32)) -> Option<CellState> {
@@ -220,13 +241,12 @@ impl Logic {
         }
     }
 
-    fn unveil_surrounding_if_safe(&mut self, gui: &mut GUI, pos: (usize, usize))
-    {
+    fn safe_cell_environment(&self, pos: (usize, usize)) -> CellEnvironment {
         let n;
         match self.game_state[pos.1][pos.0] {
-            CellState::Safe(x) => n = x,
+            CellState::Safe(x) => { n = x; },
 
-            _ => return
+            _ => return CellEnvironment::Unsure
         };
 
         let mut flag_count = 0;
@@ -255,9 +275,21 @@ impl Logic {
         }
 
         if flag_count == n {
-            self.unveil_surrounding(gui, pos);
+            CellEnvironment::AllSafe
         } else if potential_mine_count == n {
-            self.flag_surrounding(gui, pos);
+            CellEnvironment::AllMines
+        } else {
+            CellEnvironment::Unsure
+        }
+    }
+
+    fn unveil_surrounding_if_safe(&mut self, gui: &mut GUI, pos: (usize, usize))
+    {
+        match self.safe_cell_environment(pos) {
+            CellEnvironment::AllSafe  => self.unveil_surrounding(gui, pos),
+            CellEnvironment::AllMines => self.flag_surrounding(gui, pos),
+
+            _ => ()
         }
     }
 
