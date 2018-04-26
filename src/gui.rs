@@ -99,11 +99,16 @@ impl GUI {
                     let cbs = &mut *cloned_this.borrow_mut();
 
                     match mb.get_button() {
-                        1 => cbl.pressed(cbs, (x, y)),
-                        3 => cbl.toggle_flag(cbs, (x, y)),
+                        1 => cbl.pressed((x, y)),
+                        3 => cbl.toggle_flag((x, y)),
 
                         _ => ()
                     };
+
+                    for update in cbl.get_ui_updates() {
+                        cbs.set_cell_state(update.pos, update.state);
+                    }
+                    cbs.set_flag_count(cbl.get_flag_count());
 
                     Inhibit(false)
                 });

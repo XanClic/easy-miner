@@ -1,5 +1,6 @@
+use std;
+
 use game::{CellLabel, Game};
-use gui::GUI;
 
 
 #[derive(PartialEq, Clone, Copy)]
@@ -17,6 +18,12 @@ enum CellEnvironment {
 }
 
 
+pub struct UIUpdate {
+    pub pos: (usize, usize),
+    pub state: CellState,
+}
+
+
 pub struct Logic {
     game: Game,
 
@@ -30,6 +37,7 @@ pub struct Logic {
     game_state: Vec<Vec<CellState>>,
 
     game_over: bool,
+    ui_updates: Vec<UIUpdate>,
 }
 
 
@@ -61,6 +69,7 @@ impl Logic {
             game_state: state_vec,
 
             game_over: false,
+            ui_updates: Vec::<UIUpdate>::new(),
         }
     }
 
@@ -80,31 +89,31 @@ impl Logic {
         }
     }
 
-    fn unveil_surrounding(&mut self, gui: &mut GUI, pos: (usize, usize)) {
+    fn unveil_surrounding(&mut self, pos: (usize, usize)) {
         let ipos = (pos.0 as i32, pos.1 as i32);
         for yd in -1..2 {
             for xd in -1..2 {
                 let dpos = (ipos.0 + xd, ipos.1 + yd);
                 if let Some(upos) = self.pos_in_bounds(dpos) {
-                    self.unveil(gui, upos);
+                    self.unveil(upos);
                 }
             }
         }
     }
 
-    fn flag_surrounding(&mut self, gui: &mut GUI, pos: (usize, usize)) {
+    fn flag_surrounding(&mut self, pos: (usize, usize)) {
         let ipos = (pos.0 as i32, pos.1 as i32);
         for yd in -1..2 {
             for xd in -1..2 {
                 let dpos = (ipos.0 + xd, ipos.1 + yd);
                 if let Some(upos) = self.pos_in_bounds(dpos) {
-                    self.flag(gui, upos);
+                    self.flag(upos);
                 }
             }
         }
     }
 
-    fn unveil(&mut self, gui: &mut GUI, pos: (usize, usize)) {
+    fn unveil(&mut self, pos: (usize, usize)) {
         if self.game_state[pos.1][pos.0] != CellState::Veiled {
             return;
         }
@@ -133,7 +142,10 @@ impl Logic {
                     for x in 0..dim.0 {
                         match self.game.get_cell_label((x, y)) {
                             CellLabel::Mine =>
-                                gui.set_cell_state((x, y), CellState::Mine),
+                                self.ui_updates.push(UIUpdate {
+                                    pos: (x, y),
+                                    state: CellState::Mine,
+                                }),
 
                             _ => ()
                         }
@@ -143,14 +155,14 @@ impl Logic {
             },
 
             CellLabel::Safe(0) => {
-                self.unveil_surrounding(gui, pos);
+                self.unveil_surrounding(pos);
             },
 
             CellLabel::Safe(_) => (),
         }
 
         self.unveiled_count += 1;
-        gui.set_cell_state(pos, state);
+        self.ui_updates.push(UIUpdate { pos: pos, state: state });
 
         let dim = self.game.get_dim();
         if self.unveiled_count + self.mine_count == dim.0 * dim.1 {
@@ -162,7 +174,7 @@ impl Logic {
                 for y in 0..dim.1 {
                     for x in 0..dim.0 {
                         if self.game_state[y][x] == CellState::Veiled {
-                            self.flag(gui, (x, y));
+                            self.flag((x, y));
                         }
                     }
                 }
@@ -174,44 +186,42 @@ impl Logic {
                 for xd in -1..2 {
                     let dpos = (pos.0 as i32 + xd, pos.1 as i32 + yd);
                     if let Some(upos) = self.pos_in_bounds(dpos) {
-                        self.unveil_surrounding_if_safe(gui, upos);
+                        self.unveil_surrounding_if_safe(upos);
                     }
                 }
             }
         }
     }
 
-    fn flag(&mut self, gui: &mut GUI, pos: (usize, usize)) {
+    fn flag(&mut self, pos: (usize, usize)) {
         if self.game_state[pos.1][pos.0] != CellState::Veiled {
             return;
         }
 
         self.game_state[pos.1][pos.0] = CellState::Flagged;
         self.flag_count += 1;
-        gui.set_cell_state(pos, CellState::Flagged);
-        gui.set_flag_count(self.flag_count);
+        self.ui_updates.push(UIUpdate { pos: pos, state: CellState::Flagged });
 
         if self.auto_unveil {
             for yd in -1..2 {
                 for xd in -1..2 {
                     let dpos = (pos.0 as i32 + xd, pos.1 as i32 + yd);
                     if let Some(upos) = self.pos_in_bounds(dpos) {
-                        self.unveil_surrounding_if_safe(gui, upos);
+                        self.unveil_surrounding_if_safe(upos);
                     }
                 }
             }
         }
     }
 
-    fn unflag(&mut self, gui: &mut GUI, pos: (usize, usize)) {
+    fn unflag(&mut self, pos: (usize, usize)) {
         if self.game_state[pos.1][pos.0] != CellState::Flagged {
             return;
         }
 
         self.game_state[pos.1][pos.0] = CellState::Veiled;
         self.flag_count -= 1;
-        gui.set_cell_state(pos, CellState::Veiled);
-        gui.set_flag_count(self.flag_count);
+        self.ui_updates.push(UIUpdate { pos: pos, state: CellState::Veiled });
     }
 
     fn definitely_mined(&self, pos: (usize, usize)) -> bool {
@@ -283,17 +293,17 @@ impl Logic {
         }
     }
 
-    fn unveil_surrounding_if_safe(&mut self, gui: &mut GUI, pos: (usize, usize))
+    fn unveil_surrounding_if_safe(&mut self, pos: (usize, usize))
     {
         match self.safe_cell_environment(pos) {
-            CellEnvironment::AllSafe  => self.unveil_surrounding(gui, pos),
-            CellEnvironment::AllMines => self.flag_surrounding(gui, pos),
+            CellEnvironment::AllSafe  => self.unveil_surrounding(pos),
+            CellEnvironment::AllMines => self.flag_surrounding(pos),
 
             _ => ()
         }
     }
 
-    pub fn pressed(&mut self, gui: &mut GUI, pos: (usize, usize)) {
+    pub fn pressed(&mut self, pos: (usize, usize)) {
         if self.game_over {
             return;
         }
@@ -302,31 +312,31 @@ impl Logic {
             CellState::Veiled => {
                 if self.touch_mode {
                     if self.definitely_mined(pos) {
-                        self.flag(gui, pos);
+                        self.flag(pos);
                     } else {
-                        self.unveil(gui, pos);
+                        self.unveil(pos);
                     }
                 } else {
-                    self.unveil(gui, pos);
+                    self.unveil(pos);
                 }
             },
 
             CellState::Safe(_) => {
-                self.unveil_surrounding_if_safe(gui, pos);
+                self.unveil_surrounding_if_safe(pos);
             },
 
             _ => ()
         }
     }
 
-    pub fn toggle_flag(&mut self, gui: &mut GUI, pos: (usize, usize)) {
+    pub fn toggle_flag(&mut self, pos: (usize, usize)) {
         if self.game_over {
             return;
         }
 
         match self.game_state[pos.1][pos.0] {
-            CellState::Veiled => self.flag(gui, pos),
-            CellState::Flagged => self.unflag(gui, pos),
+            CellState::Veiled => self.flag(pos),
+            CellState::Flagged => self.unflag(pos),
 
             _ => ()
         }
@@ -334,6 +344,14 @@ impl Logic {
 
     pub fn get_mine_count(&self) -> usize {
         self.mine_count
+    }
+
+    pub fn get_flag_count(&self) -> usize {
+        self.flag_count
+    }
+
+    pub fn get_ui_updates(&mut self) -> Vec<UIUpdate> {
+        std::mem::replace(&mut self.ui_updates, Vec::<UIUpdate>::new())
     }
 
     pub fn new_game(&mut self) {
