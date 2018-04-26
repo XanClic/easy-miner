@@ -21,6 +21,8 @@ pub struct Logic {
     mine_count: usize,
     unveiled_count: usize,
     game_state: Vec<Vec<CellState>>,
+
+    game_over: bool,
 }
 
 
@@ -49,6 +51,8 @@ impl Logic {
             mine_count: mine_count,
             unveiled_count: 0,
             game_state: state_vec,
+
+            game_over: false,
         }
     }
 
@@ -112,6 +116,9 @@ impl Logic {
 
         match label {
             CellLabel::Mine => {
+                // Hit a mine, so the game has been lost
+                self.game_over = true;
+
                 /* Unveil all mines */
                 let dim = self.game.get_dim();
                 for y in 0..dim.1 {
@@ -138,15 +145,17 @@ impl Logic {
         gui.set_cell_state(pos, state);
 
         let dim = self.game.get_dim();
-        if self.unveiled_count + self.mine_count == dim.0 * dim.1 &&
-           self.flag_count < self.mine_count
-        {
-            // Unveiled all safe cells (i.e. won the game), so auto-flag the
-            // rest
-            for y in 0..dim.1 {
-                for x in 0..dim.0 {
-                    if self.game_state[y][x] == CellState::Veiled {
-                        self.flag(gui, (x, y));
+        if self.unveiled_count + self.mine_count == dim.0 * dim.1 {
+            // Unveiled all safe cells, so the game has been won
+            self.game_over = true;
+
+            if self.flag_count < self.mine_count {
+                // Auto-flag the rest
+                for y in 0..dim.1 {
+                    for x in 0..dim.0 {
+                        if self.game_state[y][x] == CellState::Veiled {
+                            self.flag(gui, (x, y));
+                        }
                     }
                 }
             }
@@ -251,6 +260,10 @@ impl Logic {
     }
 
     pub fn pressed(&mut self, gui: &mut GUI, pos: (usize, usize)) {
+        if self.game_over {
+            return;
+        }
+
         match self.game_state[pos.1][pos.0] {
             CellState::Veiled => {
                 if self.definitely_mined(pos) {
@@ -269,6 +282,10 @@ impl Logic {
     }
 
     pub fn toggle_flag(&mut self, gui: &mut GUI, pos: (usize, usize)) {
+        if self.game_over {
+            return;
+        }
+
         match self.game_state[pos.1][pos.0] {
             CellState::Veiled => self.flag(gui, pos),
             CellState::Flagged => self.unflag(gui, pos),
@@ -294,5 +311,7 @@ impl Logic {
         self.mines_spread = false;
         self.flag_count = 0;
         self.unveiled_count = 0;
+
+        self.game_over = false;
     }
 }
