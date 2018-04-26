@@ -18,6 +18,8 @@ pub struct Logic {
 
     mines_spread: bool,
     flag_count: usize,
+    mine_count: usize,
+    unveiled_count: usize,
     game_state: Vec<Vec<CellState>>,
 }
 
@@ -35,6 +37,8 @@ impl Logic {
             state_vec.push(row);
         }
 
+        let mine_count = game.get_mine_count();
+
         Logic {
             game: game,
 
@@ -42,6 +46,8 @@ impl Logic {
 
             mines_spread: false,
             flag_count: 0,
+            mine_count: mine_count,
+            unveiled_count: 0,
             game_state: state_vec,
         }
     }
@@ -128,7 +134,23 @@ impl Logic {
             CellLabel::Safe(_) => (),
         }
 
+        self.unveiled_count += 1;
         gui.set_cell_state(pos, state);
+
+        let dim = self.game.get_dim();
+        if self.unveiled_count + self.mine_count == dim.0 * dim.1 &&
+           self.flag_count < self.mine_count
+        {
+            // Unveiled all safe cells (i.e. won the game), so auto-flag the
+            // rest
+            for y in 0..dim.1 {
+                for x in 0..dim.0 {
+                    if self.game_state[y][x] == CellState::Veiled {
+                        self.flag(gui, (x, y));
+                    }
+                }
+            }
+        }
 
         if self.auto_unveil {
             for yd in -1..2 {
@@ -256,7 +278,7 @@ impl Logic {
     }
 
     pub fn get_mine_count(&self) -> usize {
-        self.game.get_mine_count()
+        self.mine_count
     }
 
     pub fn new_game(&mut self) {
@@ -271,5 +293,6 @@ impl Logic {
 
         self.mines_spread = false;
         self.flag_count = 0;
+        self.unveiled_count = 0;
     }
 }
