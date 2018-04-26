@@ -22,12 +22,38 @@ fn main() {
     let mut mine_count = 99;
 
     let mut auto_unveil = false;
+    let mut touch_mode = false;
 
     for arg in args {
         if arg.starts_with("--") {
             match arg.as_ref() {
                 "--auto-unveil" => {
                     auto_unveil = true;
+                },
+
+                "--touch-mode" => {
+                    touch_mode = true;
+                },
+
+                "--help" => {
+                    println!("Available switches:");
+                    println!("  --auto-unveil:");
+                    println!("    Automatically unveil/flag surrounding cells \
+                                  of an unveiled/flagged");
+                    println!("    cell if the number of veiled non-flagged \
+                                  surrounding cells is");
+                    println!("    equal to the cell’s number label (i.e. what \
+                                  happens when manually");
+                    println!("    clicking on an unveiled cell).");
+                    println!("");
+                    println!("  --touch-mode:");
+                    println!("    When clicking on a veiled cell, try to \
+                                  figure out whether you");
+                    println!("    would think it is safe or a mine.  Depending \
+                                  on the answer, the");
+                    println!("    field will be unveiled of flagged.");
+
+                    return;
                 },
 
                 _ => {
@@ -55,7 +81,7 @@ fn main() {
     }
 
     let game = Game::new((width, height), mine_count);
-    let logic = Logic::new(game, auto_unveil);
+    let logic = Logic::new(game, auto_unveil, touch_mode);
     let gui = GUI::new(logic);
 
     gui.main_loop();

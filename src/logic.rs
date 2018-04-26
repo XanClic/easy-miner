@@ -15,6 +15,7 @@ pub struct Logic {
     game: Game,
 
     auto_unveil: bool,
+    touch_mode: bool,
 
     mines_spread: bool,
     flag_count: usize,
@@ -27,7 +28,7 @@ pub struct Logic {
 
 
 impl Logic {
-    pub fn new(game: Game, auto_unveil: bool) -> Self {
+    pub fn new(game: Game, auto_unveil: bool, touch_mode: bool) -> Self {
         let dim = game.get_dim();
         let mut state_vec = Vec::<Vec<CellState>>::new();
 
@@ -45,6 +46,7 @@ impl Logic {
             game: game,
 
             auto_unveil: auto_unveil,
+            touch_mode: touch_mode,
 
             mines_spread: false,
             flag_count: 0,
@@ -266,8 +268,12 @@ impl Logic {
 
         match self.game_state[pos.1][pos.0] {
             CellState::Veiled => {
-                if self.definitely_mined(pos) {
-                    self.flag(gui, pos);
+                if self.touch_mode {
+                    if self.definitely_mined(pos) {
+                        self.flag(gui, pos);
+                    } else {
+                        self.unveil(gui, pos);
+                    }
                 } else {
                     self.unveil(gui, pos);
                 }
