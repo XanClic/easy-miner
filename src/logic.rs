@@ -234,22 +234,10 @@ impl Logic {
     }
 
     fn definitely_mined(&self, pos: (usize, usize)) -> bool {
-        let ipos = (pos.0 as i32, pos.1 as i32);
-        for yd in -1..2 {
-            for xd in -1..2 {
-                let dpos = (ipos.0 + xd, ipos.1 + yd);
-                if let Some(upos) = self.pos_in_bounds(dpos) {
-                    match self.game_state.safe_cell_environment(upos) {
-                        CellEnvironment::AllSafe  => return false,
-                        CellEnvironment::AllMines => return true,
+        let mut hypothetical_state = self.game_state.clone();
 
-                        _ => ()
-                    }
-                }
-            }
-        }
-
-        return false;
+        hypothetical_state.set(pos, ICellState::DefinitelySafe);
+        return !hypothetical_state.environment_propagate(pos);
     }
 
     fn unveil_surrounding_if_safe(&mut self, pos: (usize, usize))
@@ -437,5 +425,97 @@ impl GameState {
         } else {
             CellEnvironment::Unsure
         }
+    }
+
+    // Analyzes the environment of @pos.  If everything must be mines,
+    // they are all flagged.  If everything must be safe, it is marked
+    // as DefinitelySafe.
+    // If the state is impossible, false is returned.  Otherwise, true
+    // is returned.
+    fn propagate(&mut self, pos: (usize, usize)) -> bool {
+        match self.safe_cell_environment(pos) {
+            CellEnvironment::AllSafe =>
+                self.mark_environment_safe(pos),
+
+            CellEnvironment::AllMines =>
+                self.mark_environment_mines(pos),
+
+            CellEnvironment::Unsure =>
+                true,
+
+            CellEnvironment::Impossible =>
+                false,
+        }
+    }
+
+    fn environment_propagate(&mut self, center: (usize, usize)) -> bool {
+        for yd in -1..2 {
+            for xd in -1..2 {
+                if xd == 0 && yd == 0 {
+                    continue;
+                }
+
+                let dpos = (center.0 as i32 + xd, center.1 as i32 + yd);
+                if let Some(upos) = self.pos_in_bounds(dpos) {
+                    if !self.propagate(upos) {
+                        return false;
+                    }
+                }
+            }
+        }
+
+        return true;
+    }
+
+    fn mark_environment_safe(&mut self, pos: (usize, usize)) -> bool {
+        for yd in -1..2 {
+            for xd in -1..2 {
+                if xd == 0 && yd == 0 {
+                    continue;
+                }
+
+                let dpos = (pos.0 as i32 + xd, pos.1 as i32 + yd);
+                if let Some(upos) = self.pos_in_bounds(dpos) {
+                    match self.get(upos) {
+                        ICellState::Veiled => {
+                            self.set(upos, ICellState::DefinitelySafe);
+                            if !self.environment_propagate(upos) {
+                                return false;
+                            }
+                        },
+
+                        _ => ()
+                    }
+                }
+            }
+        }
+
+        return true;
+    }
+
+    fn mark_environment_mines(&mut self, pos: (usize, usize)) -> bool {
+        for yd in -1..2 {
+            for xd in -1..2 {
+                if xd == 0 && yd == 0 {
+                    continue;
+                }
+
+                let dpos = (pos.0 as i32 + xd, pos.1 as i32 + yd);
+                if let Some(upos) = self.pos_in_bounds(dpos) {
+                    match self.get(upos) {
+                        ICellState::Veiled => {
+                            self.set(upos, ICellState::Flagged);
+                            if !self.environment_propagate(upos) {
+                                return false;
+                            }
+                        },
+
+                        _ => ()
+                    }
+                }
+            }
+        }
+
+        return true;
     }
 }
