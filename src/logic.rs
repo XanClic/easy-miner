@@ -37,6 +37,9 @@ pub struct UIUpdate {
 struct GameState {
     board: Vec<Vec<ICellState>>,
     dim: (usize, usize),
+    flag_count: usize,
+    mine_count: usize,
+    unveiled_count: usize,
 }
 
 pub struct Logic {
@@ -71,7 +74,7 @@ impl Logic {
             flag_count: 0,
             mine_count: mine_count,
             unveiled_count: 0,
-            game_state: GameState::new(dim),
+            game_state: GameState::new(dim, mine_count),
 
             game_over: false,
             ui_updates: Vec::<UIUpdate>::new(),
@@ -333,7 +336,7 @@ impl CellState {
 
 
 impl GameState {
-    fn new(dim: (usize, usize)) -> Self {
+    fn new(dim: (usize, usize), mine_count: usize) -> Self {
         let mut board = Vec::<Vec<ICellState>>::new();
 
         for _ in 0..dim.1 {
@@ -347,6 +350,9 @@ impl GameState {
         GameState {
             board: board,
             dim: dim,
+            flag_count: 0,
+            mine_count: mine_count,
+            unveiled_count: 0,
         }
     }
 
@@ -356,6 +362,9 @@ impl GameState {
                 self.board[y][x] = ICellState::Veiled;
             }
         }
+
+        self.flag_count = 0;
+        self.unveiled_count = 0;
     }
 
     fn get(&self, pos: (usize, usize)) -> ICellState {
@@ -363,6 +372,24 @@ impl GameState {
     }
 
     fn set(&mut self, pos: (usize, usize), state: ICellState) {
+        let old_state = self.get(pos);
+
+        if old_state == state {
+            return;
+        }
+
+        match state {
+            ICellState::Flagged => {
+                self.flag_count += 1;
+            },
+
+            ICellState::DefinitelySafe | ICellState::Safe(_) => {
+                self.unveiled_count += 1;
+            },
+
+            _ => ()
+        }
+
         self.board[pos.1][pos.0] = state;
     }
 
@@ -449,6 +476,10 @@ impl GameState {
     }
 
     fn environment_propagate(&mut self, center: (usize, usize)) -> bool {
+        if !self.sanity_check() {
+            return false;
+        }
+
         for yd in -1..2 {
             for xd in -1..2 {
                 if xd == 0 && yd == 0 {
@@ -479,6 +510,9 @@ impl GameState {
                     match self.get(upos) {
                         ICellState::Veiled => {
                             self.set(upos, ICellState::DefinitelySafe);
+                            if !self.sanity_check() {
+                                return false;
+                            }
                             if !self.environment_propagate(upos) {
                                 return false;
                             }
@@ -505,6 +539,9 @@ impl GameState {
                     match self.get(upos) {
                         ICellState::Veiled => {
                             self.set(upos, ICellState::Flagged);
+                            if !self.sanity_check() {
+                                return false;
+                            }
                             if !self.environment_propagate(upos) {
                                 return false;
                             }
@@ -514,6 +551,18 @@ impl GameState {
                     }
                 }
             }
+        }
+
+        return true;
+    }
+
+    fn sanity_check(&self) -> bool {
+        if self.flag_count > self.mine_count {
+            return false;
+        }
+
+        if self.unveiled_count + self.mine_count > self.dim.0 * self.dim.1 {
+            return false;
         }
 
         return true;
