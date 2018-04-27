@@ -239,7 +239,7 @@ impl Logic {
             for xd in -1..2 {
                 let dpos = (ipos.0 + xd, ipos.1 + yd);
                 if let Some(upos) = self.pos_in_bounds(dpos) {
-                    match self.safe_cell_environment(upos) {
+                    match self.game_state.safe_cell_environment(upos) {
                         CellEnvironment::AllSafe  => return false,
                         CellEnvironment::AllMines => return true,
 
@@ -252,52 +252,9 @@ impl Logic {
         return false;
     }
 
-    fn safe_cell_environment(&self, pos: (usize, usize)) -> CellEnvironment {
-        let n;
-        match self.game_state.get(pos) {
-            ICellState::Safe(x) => { n = x; },
-
-            _ => return CellEnvironment::Unsure
-        };
-
-        let mut flag_count = 0;
-        let mut potential_mine_count = 0;
-        let ipos = (pos.0 as i32, pos.1 as i32);
-        for yd in -1..2 {
-            for xd in -1..2 {
-                match self.game_state.get_i32((ipos.0 + xd, ipos.1 + yd)) {
-                    Some(ICellState::Veiled) => {
-                        potential_mine_count += 1;
-                    }
-
-                    Some(ICellState::Flagged) => {
-                        flag_count += 1;
-                        potential_mine_count += 1;
-                    },
-
-                    Some(ICellState::Mine) => {
-                        potential_mine_count += 1;
-                    },
-
-                    _ => ()
-                };
-            }
-        }
-
-        if flag_count == n {
-            CellEnvironment::AllSafe
-        } else if potential_mine_count == n {
-            CellEnvironment::AllMines
-        } else if flag_count > n || potential_mine_count < n {
-            CellEnvironment::Impossible
-        } else {
-            CellEnvironment::Unsure
-        }
-    }
-
     fn unveil_surrounding_if_safe(&mut self, pos: (usize, usize))
     {
-        match self.safe_cell_environment(pos) {
+        match self.game_state.safe_cell_environment(pos) {
             CellEnvironment::AllSafe  => self.unveil_surrounding(pos),
             CellEnvironment::AllMines => self.flag_surrounding(pos),
 
@@ -436,6 +393,49 @@ impl GameState {
             Some(self.board[upos.1][upos.0])
         } else {
             None
+        }
+    }
+
+    fn safe_cell_environment(&self, pos: (usize, usize)) -> CellEnvironment {
+        let n;
+        match self.get(pos) {
+            ICellState::Safe(x) => { n = x; },
+
+            _ => return CellEnvironment::Unsure
+        };
+
+        let mut flag_count = 0;
+        let mut potential_mine_count = 0;
+        let ipos = (pos.0 as i32, pos.1 as i32);
+        for yd in -1..2 {
+            for xd in -1..2 {
+                match self.get_i32((ipos.0 + xd, ipos.1 + yd)) {
+                    Some(ICellState::Veiled) => {
+                        potential_mine_count += 1;
+                    }
+
+                    Some(ICellState::Flagged) => {
+                        flag_count += 1;
+                        potential_mine_count += 1;
+                    },
+
+                    Some(ICellState::Mine) => {
+                        potential_mine_count += 1;
+                    },
+
+                    _ => ()
+                };
+            }
+        }
+
+        if flag_count == n {
+            CellEnvironment::AllSafe
+        } else if potential_mine_count == n {
+            CellEnvironment::AllMines
+        } else if flag_count > n || potential_mine_count < n {
+            CellEnvironment::Impossible
+        } else {
+            CellEnvironment::Unsure
         }
     }
 }
