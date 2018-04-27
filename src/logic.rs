@@ -33,6 +33,11 @@ pub struct UIUpdate {
     pub state: CellState,
 }
 
+#[derive(Clone)]
+struct GameState {
+    board: Vec<Vec<ICellState>>,
+    dim: (usize, usize),
+}
 
 pub struct Logic {
     game: Game,
@@ -44,7 +49,7 @@ pub struct Logic {
     flag_count: usize,
     mine_count: usize,
     unveiled_count: usize,
-    game_state: Vec<Vec<ICellState>>,
+    game_state: GameState,
 
     game_over: bool,
     ui_updates: Vec<UIUpdate>,
@@ -54,16 +59,6 @@ pub struct Logic {
 impl Logic {
     pub fn new(game: Game, auto_unveil: bool, touch_mode: bool) -> Self {
         let dim = game.get_dim();
-        let mut state_vec = Vec::<Vec<ICellState>>::new();
-
-        for _ in 0..dim.1 {
-            let mut row = Vec::<ICellState>::new();
-            for _ in 0..dim.0 {
-                row.push(ICellState::Veiled);
-            }
-            state_vec.push(row);
-        }
-
         let mine_count = game.get_mine_count();
 
         Logic {
@@ -76,7 +71,7 @@ impl Logic {
             flag_count: 0,
             mine_count: mine_count,
             unveiled_count: 0,
-            game_state: state_vec,
+            game_state: GameState::new(dim),
 
             game_over: false,
             ui_updates: Vec::<UIUpdate>::new(),
@@ -124,9 +119,9 @@ impl Logic {
     }
 
     fn unveil(&mut self, pos: (usize, usize)) {
-        assert!(self.game_state[pos.1][pos.0] != ICellState::DefinitelySafe);
+        assert!(self.game_state.get(pos) != ICellState::DefinitelySafe);
 
-        if self.game_state[pos.1][pos.0] != ICellState::Veiled {
+        if self.game_state.get(pos) != ICellState::Veiled {
             return;
         }
 
@@ -141,7 +136,7 @@ impl Logic {
             CellLabel::Mine    => ICellState::Mine,
             CellLabel::Safe(n) => ICellState::Safe(n),
         };
-        self.game_state[pos.1][pos.0] = state;
+        self.game_state.set(pos, state);
 
         match label {
             CellLabel::Mine => {
@@ -188,7 +183,7 @@ impl Logic {
                 // Auto-flag the rest
                 for y in 0..dim.1 {
                     for x in 0..dim.0 {
-                        if self.game_state[y][x] == ICellState::Veiled {
+                        if self.game_state.get((x, y)) == ICellState::Veiled {
                             self.flag((x, y));
                         }
                     }
@@ -197,48 +192,45 @@ impl Logic {
         }
 
         if self.auto_unveil {
-            for yd in -1..2 {
-                for xd in -1..2 {
-                    let dpos = (pos.0 as i32 + xd, pos.1 as i32 + yd);
-                    if let Some(upos) = self.pos_in_bounds(dpos) {
-                        self.unveil_surrounding_if_safe(upos);
-                    }
-                }
-            }
+            self.unveil_around_sis(pos);
         }
     }
 
     fn flag(&mut self, pos: (usize, usize)) {
-        assert!(self.game_state[pos.1][pos.0] != ICellState::DefinitelySafe);
+        assert!(self.game_state.get(pos) != ICellState::DefinitelySafe);
 
-        if self.game_state[pos.1][pos.0] != ICellState::Veiled {
+        if self.game_state.get(pos) != ICellState::Veiled {
             return;
         }
 
-        self.game_state[pos.1][pos.0] = ICellState::Flagged;
+        self.game_state.set(pos, ICellState::Flagged);
         self.flag_count += 1;
         self.ui_updates.push(UIUpdate { pos: pos, state: CellState::Flagged });
 
         if self.auto_unveil {
-            for yd in -1..2 {
-                for xd in -1..2 {
-                    let dpos = (pos.0 as i32 + xd, pos.1 as i32 + yd);
-                    if let Some(upos) = self.pos_in_bounds(dpos) {
-                        self.unveil_surrounding_if_safe(upos);
-                    }
-                }
-            }
+            self.unveil_around_sis(pos);
         }
     }
 
     fn unflag(&mut self, pos: (usize, usize)) {
-        if self.game_state[pos.1][pos.0] != ICellState::Flagged {
+        if self.game_state.get(pos) != ICellState::Flagged {
             return;
         }
 
-        self.game_state[pos.1][pos.0] = ICellState::Veiled;
+        self.game_state.set(pos, ICellState::Veiled);
         self.flag_count -= 1;
         self.ui_updates.push(UIUpdate { pos: pos, state: CellState::Veiled });
+    }
+
+    fn unveil_around_sis(&mut self, center: (usize, usize)) {
+        for yd in -1..2 {
+            for xd in -1..2 {
+                let dpos = (center.0 as i32 + xd, center.1 as i32 + yd);
+                if let Some(upos) = self.pos_in_bounds(dpos) {
+                    self.unveil_surrounding_if_safe(upos);
+                }
+            }
+        }
     }
 
     fn definitely_mined(&self, pos: (usize, usize)) -> bool {
@@ -260,17 +252,9 @@ impl Logic {
         return false;
     }
 
-    fn get_state(&self, pos: (i32, i32)) -> Option<ICellState> {
-        if let Some(upos) = self.pos_in_bounds(pos) {
-            Some(self.game_state[upos.1][upos.0])
-        } else {
-            None
-        }
-    }
-
     fn safe_cell_environment(&self, pos: (usize, usize)) -> CellEnvironment {
         let n;
-        match self.game_state[pos.1][pos.0] {
+        match self.game_state.get(pos) {
             ICellState::Safe(x) => { n = x; },
 
             _ => return CellEnvironment::Unsure
@@ -281,8 +265,7 @@ impl Logic {
         let ipos = (pos.0 as i32, pos.1 as i32);
         for yd in -1..2 {
             for xd in -1..2 {
-                let state = self.get_state((ipos.0 + xd, ipos.1 + yd));
-                match state {
+                match self.game_state.get_i32((ipos.0 + xd, ipos.1 + yd)) {
                     Some(ICellState::Veiled) => {
                         potential_mine_count += 1;
                     }
@@ -327,9 +310,9 @@ impl Logic {
             return;
         }
 
-        assert!(self.game_state[pos.1][pos.0] != ICellState::DefinitelySafe);
+        assert!(self.game_state.get(pos) != ICellState::DefinitelySafe);
 
-        match self.game_state[pos.1][pos.0] {
+        match self.game_state.get(pos) {
             ICellState::Veiled => {
                 if self.touch_mode {
                     if self.definitely_mined(pos) {
@@ -355,9 +338,9 @@ impl Logic {
             return;
         }
 
-        assert!(self.game_state[pos.1][pos.0] != ICellState::DefinitelySafe);
+        assert!(self.game_state.get(pos) != ICellState::DefinitelySafe);
 
-        match self.game_state[pos.1][pos.0] {
+        match self.game_state.get(pos) {
             ICellState::Veiled => self.flag(pos),
             ICellState::Flagged => self.unflag(pos),
 
@@ -380,13 +363,7 @@ impl Logic {
     pub fn new_game(&mut self) {
         self.game.new_game();
 
-        let dim = self.game.get_dim();
-        for y in 0..dim.1 {
-            for x in 0..dim.0 {
-                self.game_state[y][x] = ICellState::Veiled;
-            }
-        }
-
+        self.game_state.clear();
         self.mines_spread = false;
         self.flag_count = 0;
         self.unveiled_count = 0;
@@ -405,6 +382,60 @@ impl CellState {
             ICellState::Safe(n) => CellState::Safe(n),
 
             _ => panic!("Cannot convert ICellState to CellState")
+        }
+    }
+}
+
+
+impl GameState {
+    fn new(dim: (usize, usize)) -> Self {
+        let mut board = Vec::<Vec<ICellState>>::new();
+
+        for _ in 0..dim.1 {
+            let mut row = Vec::<ICellState>::new();
+            for _ in 0..dim.0 {
+                row.push(ICellState::Veiled);
+            }
+            board.push(row);
+        }
+
+        GameState {
+            board: board,
+            dim: dim,
+        }
+    }
+
+    fn clear(&mut self) {
+        for y in 0..self.dim.1 {
+            for x in 0..self.dim.0 {
+                self.board[y][x] = ICellState::Veiled;
+            }
+        }
+    }
+
+    fn get(&self, pos: (usize, usize)) -> ICellState {
+        self.board[pos.1][pos.0]
+    }
+
+    fn set(&mut self, pos: (usize, usize), state: ICellState) {
+        self.board[pos.1][pos.0] = state;
+    }
+
+    fn pos_in_bounds(&self, pos: (i32, i32)) -> Option<(usize, usize)> {
+        if pos.0 >= 0 && (pos.0 as usize) < self.dim.0 &&
+           pos.1 >= 0 && (pos.1 as usize) < self.dim.1
+        {
+            Some((pos.0 as usize, pos.1 as usize))
+        } else {
+            None
+        }
+    }
+
+    fn get_i32(&self, pos: (i32, i32)) -> Option<ICellState> {
+        if let Some(upos) = self.pos_in_bounds(pos) {
+            Some(self.board[upos.1][upos.0])
+        } else {
+            None
         }
     }
 }
